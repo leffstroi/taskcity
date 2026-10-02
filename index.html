@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Биринчи</title>
+  <style>
+    :root { --bg:#121614; --card:#1c2420; --ink:#f3efe6; --muted:#a7b2ab; --line:#2d3a34; --accent:#d7ff4a; --bad:#ffb4a8; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font-family:Georgia,serif; }
+    main { max-width:720px; margin:0 auto; padding:18px 14px 56px; }
+    h1 { font-size:34px; margin:6px 0; }
+    h2 { font-size:20px; margin:0 0 8px; }
+    p,li { line-height:1.4; }
+    .muted { color:var(--muted); }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:14px; margin:12px 0; }
+    input,select,textarea,button { width:100%; font:inherit; border-radius:12px; border:1px solid var(--line); background:#101512; color:var(--ink); padding:12px; }
+    label { display:block; color:var(--muted); font-size:14px; margin:10px 0 6px; }
+    button { background:var(--accent); color:#17200c; border:0; font-weight:700; margin-top:10px; }
+    button.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    table { width:100%; border-collapse:collapse; }
+    td { padding:8px 4px; border-top:1px solid var(--line); }
+    .me { color:var(--accent); }
+    .tabs { display:flex; gap:6px; }
+    .tabs button { margin:0; background:#101512; color:var(--ink); }
+    .tabs button.on { background:var(--accent); color:#17200c; }
+    .shot { font-size:13px; color:var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <p class="muted">Кыргызстан · неделя города</p>
+  <h1>Биринчи</h1>
+  <p class="muted">Первое место не за вход. За то, что после тебя двор, остановка или подъезд стали чище, и это видно на двух снимках.</p>
+
+  <section class="card" id="gate">
+    <h2>Войти в таблицу своего города</h2>
+    <label>Прозвище, не настоящее имя</label>
+    <input id="nick" maxlength="18" placeholder="например, сары-озеро" />
+    <div class="row">
+      <div>
+        <label>Область</label>
+        <select id="region">
+          <option>Бишкек</option><option>Чүй</option><option>Ош</option><option>Ош шаары</option>
+          <option>Жалал-Абад</option><option>Ысык-Көл</option><option>Нарын</option><option>Талас</option><option>Баткен</option>
+        </select>
+      </div>
+      <div>
+        <label>Город</label>
+        <input id="city" value="Бишкек" />
+      </div>
+    </div>
+    <button id="join" type="button">Занять место</button>
+  </section>
+
+  <section class="card" id="play" hidden>
+    <h2 id="hello"></h2>
+    <p id="quest"></p>
+    <label>Что стало иначе после тебя</label>
+    <textarea id="proof" placeholder="Убрал пакеты у лавочки во дворе на Ибраимова. Было 4 мешка, стало пусто."></textarea>
+    <label>Фото до</label>
+    <input id="before" type="file" accept="image/*" />
+    <label>Фото после</label>
+    <input id="after" type="file" accept="image/*" />
+    <p class="shot" id="shot-note">Два разных снимка. Одинаковое фото дважды не считается.</p>
+    <button id="send" type="button">Сдать задание</button>
+    <p id="judge"></p>
+    <button class="ghost" id="out" type="button">Выйти</button>
+  </section>
+
+  <section class="card">
+    <div class="tabs">
+      <button class="on" id="tab-people" type="button">Люди</button>
+      <button id="tab-cities" type="button">Города</button>
+      <button id="tab-regions" type="button">Области</button>
+    </div>
+    <table id="board"></table>
+    <p class="muted">Приз недели может выставить аптека, школа или двор. Деньги не поднимают строку: строку поднимает принятое дело.</p>
+  </section>
+</main>
+<script>
+const KEY = "birinchi-v1";
+const quests = [
+  "20 минут: собери мусор в одном дворе. Сними до и после с той же точки.",
+  "Отмой или освободи одну лавочку у подъезда. На снимке после должно быть видно, что сесть можно.",
+  "Сними сломанный фонарь и записку в чат дома. Очко за находку меньше, чем за убранный двор: 1 против 3."
+];
+const seed = [
+  { nick:"кайың", region:"Бишкек", city:"Бишкек", pts:9 },
+  { nick:"ак-булак", region:"Чүй", city:"Кант", pts:6 },
+  { nick:"арча", region:"Ысык-Көл", city:"Каракол", pts:4 }
+];
+let db = JSON.parse(localStorage.getItem(KEY) || "null") || { me:null, people:seed, shots:{} };
+function save(){ localStorage.setItem(KEY, JSON.stringify(db)); }
+function me(){ return db.people.find(p => p.nick === db.me); }
+
+document.getElementById("join").onclick = () => {
+  const nick = document.getElementById("nick").value.trim().toLowerCase();
+  if (nick.length < 3) return;
+  db.me = nick;
+  if (!db.people.some(p => p.nick === nick)) {
+    db.people.push({ nick, region:document.getElementById("region").value, city:document.getElementById("city").value.trim() || "Бишкек", pts:0 });
+  }
+  save(); show();
+};
+document.getElementById("out").onclick = () => { db.me = null; save(); show(); };
+
+function fileMark(file){ return file ? file.name + ":" + file.size : ""; }
+document.getElementById("send").onclick = () => {
+  const person = me();
+  const text = document.getElementById("proof").value.trim();
+  const b = document.getElementById("before").files[0];
+  const a = document.getElementById("after").files[0];
+  const note = document.getElementById("shot-note");
+  const judge = document.getElementById("judge");
+  if (!b || !a || fileMark(b) === fileMark(a)) { note.textContent = "Нужны два разных снимка. Один файл дважды — не доказательство."; return; }
+  if (text.length < 25) { judge.textContent = "Напиши, что именно стало иначе. «Сделал добро» очко не даёт."; return; }
+  const gain = /мусор|лавоч|двор|пакет|урн/.test(text.toLowerCase()) ? 3 : 1;
+  person.pts += gain;
+  save();
+  judge.textContent = gain === 3 ? "Принято: двор изменился. +3 городу и тебе." : "Принято как находка, не как сделанное дело. +1. В следующий раз сдавай то, что стало чище.";
+  document.getElementById("proof").value = "";
+  draw("people");
+};
+
+let tab = "people";
+function draw(which){
+  tab = which;
+  ["people","cities","regions"].forEach(id => document.getElementById("tab-"+id).classList.toggle("on", id===which));
+  const rows = which === "people"
+    ? [...db.people].sort((a,b)=>b.pts-a.pts).map(p => [p.nick===db.me ? p.nick+" · ты" : p.nick, p.city, p.pts, p.nick===db.me])
+    : Object.values(db.people.reduce((acc,p)=>{
+        const k = which==="cities" ? p.city : p.region;
+        acc[k] = acc[k] || { name:k, pts:0 };
+        acc[k].pts += p.pts;
+        return acc;
+      }, {})).sort((a,b)=>b.pts-a.pts).map(p => [p.name, "", p.pts, false]);
+  document.getElementById("board").innerHTML = rows.map((r,i)=>`<tr class="${r[3]?"me":""}"><td>${i+1}</td><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("");
+}
+document.getElementById("tab-people").onclick = () => draw("people");
+document.getElementById("tab-cities").onclick = () => draw("cities");
+document.getElementById("tab-regions").onclick = () => draw("regions");
+
+function show(){
+  const on = Boolean(db.me);
+  document.getElementById("gate").hidden = on;
+  document.getElementById("play").hidden = !on;
+  if (on) {
+    const p = me();
+    document.getElementById("hello").textContent = p.nick + " · " + p.city;
+    document.getElementById("quest").textContent = quests[new Date().getDate() % quests.length];
+  }
+  draw(tab);
+}
+show();
+</script>
+</body>
+</html>
